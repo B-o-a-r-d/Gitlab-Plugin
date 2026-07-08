@@ -1,0 +1,49 @@
+{
+    "name": "board/plugin-gitlab",
+    "description": "GitLab Power-Up for Board: read-only lists of commits, merge requests and issues.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["board", "kanban", "plugin", "gitlab"],
+    "require": {
+        "php": "^8.3",
+        "board/plugin-sdk": "^0.2",
+        "illuminate/support": "^11 || ^12 || ^13",
+        "illuminate/http": "^11 || ^12 || ^13",
+        "laravel/mcp": "^0.8"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0 || ^10.0",
+        "pestphp/pest": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Board\\PluginGitlab\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Board\\PluginGitlab\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Board\\PluginGitlab\\GitLabPluginServiceProvider"
+            ]
+        }
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../Plugin-SDK"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}
