@@ -4,7 +4,9 @@ use Board\PluginGitlab\GitLabPlugin;
 use Board\PluginSdk\Contracts\ProvidesListSource;
 use Board\PluginSdk\Contracts\ProvidesMcpTools;
 use Board\PluginSdk\Contracts\ProvidesOAuth;
+use Board\PluginSdk\Contracts\ProvidesSettings;
 use Board\PluginSdk\PluginRegistry;
+use Board\PluginSdk\Support\PluginSettings;
 use Illuminate\Support\Facades\Http;
 
 function gitlabPlugin(): ProvidesListSource
@@ -48,18 +50,29 @@ test('it declares the gitlab oauth endpoints and reads back the account', functi
     expect($plugin->resolveAccount('gl_token'))->toBe('octocat');
 });
 
-test('it targets a self-hosted instance via GITLAB_URL', function () {
-    $_SERVER['GITLAB_URL'] = 'https://gl.example.test';
+test('it targets a self-hosted instance via the default_instance_url setting', function () {
+    // A platform admin configured the default in the marketplace (trusted config,
+    // no SSRF check) — it is used when a board sets no instance URL of its own.
+    PluginSettings::for('gitlab')->put(['default_instance_url' => 'https://gl.example.test']);
 
-    try {
-        expect(GitLabPlugin::baseUrl())->toBe('https://gl.example.test')
-            ->and(gitlabPlugin()->authorizeUrl())->toBe('https://gl.example.test/oauth/authorize');
-    } finally {
-        unset($_SERVER['GITLAB_URL']);
-    }
+    expect(GitLabPlugin::baseUrl())->toBe('https://gl.example.test')
+        ->and(gitlabPlugin()->authorizeUrl())->toBe('https://gl.example.test/oauth/authorize');
 });
 
-test('the per-board instance_url config overrides the base URL', function () {
+test('it declares instance settings (default url + allowed hosts)', function () {
+    $plugin = gitlabPlugin();
+
+    expect($plugin)->toBeInstanceOf(ProvidesSettings::class)
+        ->and(array_column($plugin->settings(), 'key'))
+        ->toContain('default_instance_url')
+        ->toContain('allowed_hosts');
+});
+
+test('the per-board instance_url config overrides the base URL when the host is allowed', function () {
+    // gl.custom.test does not resolve, so it is only accepted via the plugin's
+    // allowed_hosts setting (a self-hosted GitLab on an internal network).
+    PluginSettings::for('gitlab')->put(['allowed_hosts' => 'gl.custom.test']);
+
     $plugin = gitlabPlugin();
     $config = ['instance_url' => 'https://gl.custom.test'];
 
@@ -70,6 +83,20 @@ test('the per-board instance_url config overrides the base URL', function () {
     Http::fake(['gl.custom.test/api/v4/user' => Http::response(['username' => 'dev'])]);
 
     expect($plugin->resolveAccount('tok', $config))->toBe('dev');
+});
+
+test('an unsafe per-board instance_url is ignored to prevent SSRF', function () {
+    // Cloud metadata, loopback, a private range, a bad scheme and junk all fall
+    // back to gitlab.com rather than letting the server hit an internal target.
+    foreach (['http://169.254.169.254', 'http://127.0.0.1', 'http://10.0.0.5', 'ftp://gitlab.com', 'not-a-url'] as $unsafe) {
+        expect(GitLabPlugin::baseUrl(['instance_url' => $unsafe]))->toBe('https://gitlab.com');
+    }
+});
+
+test('an internal instance_url is honoured when its host is on the allowed_hosts setting', function () {
+    PluginSettings::for('gitlab')->put(['allowed_hosts' => '10.0.0.5']);
+
+    expect(GitLabPlugin::baseUrl(['instance_url' => 'http://10.0.0.5']))->toBe('http://10.0.0.5');
 });
 
 test('config fields include the instance url, client id and secret', function () {

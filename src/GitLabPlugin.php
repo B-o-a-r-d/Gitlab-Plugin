@@ -7,7 +7,10 @@ use Board\PluginSdk\Contracts\Plugin;
 use Board\PluginSdk\Contracts\ProvidesListSource;
 use Board\PluginSdk\Contracts\ProvidesMcpTools;
 use Board\PluginSdk\Contracts\ProvidesOAuth;
+use Board\PluginSdk\Contracts\ProvidesSettings;
 use Board\PluginSdk\PluginListItem;
+use Board\PluginSdk\Support\PluginSettings;
+use Board\PluginSdk\Support\SafeUrl;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -19,26 +22,68 @@ use Illuminate\Support\Str;
  * Works against gitlab.com by default, or a self-hosted instance via the
  * `GITLAB_URL` environment variable (one instance per Board deployment).
  */
-class GitLabPlugin implements Plugin, ProvidesListSource, ProvidesMcpTools, ProvidesOAuth
+class GitLabPlugin implements Plugin, ProvidesListSource, ProvidesMcpTools, ProvidesOAuth, ProvidesSettings
 {
     /**
      * The GitLab instance root, shared by the OAuth endpoints, the API client and
-     * the MCP tool. Precedence: the per-board `instance_url` config field (set by an
-     * admin in the Power-Up UI) → the GITLAB_URL env (instance-wide default) →
-     * gitlab.com.
+     * the MCP tool. Precedence: the per-board `instance_url` config field (set by a
+     * board admin) → the instance-wide `default_instance_url` setting (set by a
+     * platform admin in the marketplace) → gitlab.com.
+     *
+     * SSRF defense in depth: the per-board `instance_url` is honoured only when it
+     * passes {@see SafeUrl} (http/https, no private/reserved host) so a board admin
+     * cannot point the server — and the OAuth token exchange that carries the
+     * client secret — at cloud metadata or an internal service. Self-hosted GitLab
+     * on a private network is permitted via the plugin's `allowed_hosts` setting.
+     * The `default_instance_url` is trusted (platform-admin config, no board input),
+     * so it is used as-is.
      *
      * @param  array<string, mixed>  $config
      */
     public static function baseUrl(array $config = []): string
     {
-        $url = ($config['instance_url'] ?? '') ?: (env('GITLAB_URL') ?: 'https://gitlab.com');
+        $settings = PluginSettings::for(self::key());
 
-        return rtrim((string) $url, '/');
+        $configured = trim((string) ($config['instance_url'] ?? ''));
+        $allowed = SafeUrl::parseHostList((string) $settings->get('allowed_hosts', ''));
+
+        if ($configured !== '' && SafeUrl::isSafe($configured, $allowed)) {
+            return rtrim($configured, '/');
+        }
+
+        $default = trim((string) $settings->get('default_instance_url', '')) ?: 'https://gitlab.com';
+
+        return rtrim($default, '/');
     }
 
     public static function key(): string
     {
         return 'gitlab';
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function settings(): array
+    {
+        return [
+            [
+                'key' => 'default_instance_url',
+                'label' => __('gitlab::messages.settings.default_instance_url'),
+                'type' => 'url',
+                'required' => false,
+                'placeholder' => 'https://gitlab.com',
+                'help' => __('gitlab::messages.settings.default_instance_url_help'),
+            ],
+            [
+                'key' => 'allowed_hosts',
+                'label' => __('gitlab::messages.settings.allowed_hosts'),
+                'type' => 'text',
+                'required' => false,
+                'placeholder' => 'gitlab.internal, 10.0.0.5',
+                'help' => __('gitlab::messages.settings.allowed_hosts_help'),
+            ],
+        ];
     }
 
     public function label(): string
@@ -72,7 +117,7 @@ class GitLabPlugin implements Plugin, ProvidesListSource, ProvidesMcpTools, Prov
             [
                 'key' => 'instance_url',
                 'label' => __('gitlab::messages.oauth.instance_url'),
-                'type' => 'text',
+                'type' => 'url',
                 'placeholder' => 'https://gitlab.com',
                 'help' => __('gitlab::messages.oauth.instance_url_help'),
             ],

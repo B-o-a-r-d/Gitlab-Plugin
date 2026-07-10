@@ -20,4 +20,10 @@ return [
         'client_secret' => 'GitLab OAuth · Secret',
         'client_secret_help' => 'Leave blank to keep the stored value.',
     ],
+    'settings' => [
+        'default_instance_url' => 'Default GitLab instance',
+        'default_instance_url_help' => 'Used when a board does not set its own instance URL. Leave blank for gitlab.com.',
+        'allowed_hosts' => 'Allowed internal hosts',
+        'allowed_hosts_help' => 'Comma-separated hosts on a private network that boards may target (e.g. a self-hosted GitLab). Public hosts are always allowed; internal ones must be listed here.',
+    ],
 ];

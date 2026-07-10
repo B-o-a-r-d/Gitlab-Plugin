@@ -21,9 +21,12 @@ class GitLabClient
 
     private function request(): PendingRequest
     {
+        // Do not follow redirects: a 3xx from the instance could otherwise pivot
+        // the request (and the bearer token) to an internal host (SSRF).
         $request = Http::baseUrl(rtrim($this->baseUrl, '/').'/api/v4')
             ->acceptJson()
             ->withHeaders(['User-Agent' => 'BoardBot/1.0 (+plugin-gitlab)'])
+            ->withoutRedirecting()
             ->connectTimeout(3)
             ->timeout(8);
 
