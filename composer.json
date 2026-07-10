@@ -26,6 +26,9 @@
         }
     },
     "extra": {
+        "board": {
+            "sdk_contract": 1
+        },
         "laravel": {
             "providers": [
                 "Board\\PluginGitlab\\GitLabPluginServiceProvider"
