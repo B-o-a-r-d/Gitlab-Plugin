@@ -163,3 +163,44 @@ test('an empty project yields no items and no request', function () {
 
     expect(gitlabPlugin()->items(['token' => 't'], 'commits', ['project' => ''])->all())->toBe([]);
 });
+
+test('the create_issue automation action posts to the GitLab API of the configured instance', function () {
+    PluginSettings::for('gitlab')->put(['allowed_hosts' => 'gl.custom.test']);
+    Http::fake(['gl.custom.test/*' => Http::response([
+        'iid' => 7,
+        'web_url' => 'https://gl.custom.test/group/app/-/issues/7',
+    ], 201)]);
+
+    /** @var \Board\PluginGitlab\GitLabPlugin $plugin */
+    $plugin = app(\Board\PluginSdk\PluginRegistry::class)->get('gitlab');
+
+    expect($plugin)->toBeInstanceOf(\Board\PluginSdk\Contracts\ProvidesAutomationActions::class);
+
+    $toast = $plugin->runAutomationAction(
+        ['token' => 'gl-token', 'instance_url' => 'https://gl.custom.test'],
+        'create_issue',
+        ['title' => 'Payer la facture', 'board' => 'Compta', 'list' => 'À faire'],
+        ['project' => 'group/app', 'title' => '{card}', 'labels' => 'bug'],
+    );
+
+    expect($toast)->toBeInstanceOf(\Board\PluginSdk\PluginToast::class)
+        ->and($toast->type)->toBe('success')
+        ->and($toast->description)->toBe('group/app#7')
+        ->and($toast->duration)->toBe(8000)
+        ->and($toast->actions)->toHaveCount(1)
+        ->and($toast->actions[0]['url'])->toBe('https://gl.custom.test/group/app/-/issues/7');
+
+    Http::assertSent(function ($request) {
+        return $request->url() === 'https://gl.custom.test/api/v4/projects/group%2Fapp/issues'
+            && $request['title'] === 'Payer la facture'
+            && $request['labels'] === 'bug';
+    });
+});
+
+test('the create_issue action requires a project', function () {
+    /** @var \Board\PluginGitlab\GitLabPlugin $plugin */
+    $plugin = app(\Board\PluginSdk\PluginRegistry::class)->get('gitlab');
+
+    expect(fn () => $plugin->runAutomationAction([], 'create_issue', ['title' => 'X'], []))
+        ->toThrow(RuntimeException::class);
+});

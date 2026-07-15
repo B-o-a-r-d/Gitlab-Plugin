@@ -95,6 +95,25 @@ class GitLabClient
     }
 
     /**
+     * Create an issue. Throws on HTTP failure so the host's automation
+     * pipeline can count and journal the error.
+     *
+     * @param  array<int, string>  $labels
+     * @return array<string, mixed>
+     */
+    public function createIssue(string $project, string $title, string $description = '', array $labels = []): array
+    {
+        return $this->request()
+            ->post('/projects/'.$this->projectId($project).'/issues', array_filter([
+                'title' => $title,
+                'description' => $description !== '' ? $description : null,
+                'labels' => $labels !== [] ? implode(',', $labels) : null,
+            ]))
+            ->throw()
+            ->json();
+    }
+
+    /**
      * The authenticated account, or null if the token is missing/invalid.
      *
      * @return array{username: string}|null

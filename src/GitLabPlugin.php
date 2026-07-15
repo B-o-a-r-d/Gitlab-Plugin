@@ -4,11 +4,13 @@ namespace Board\PluginGitlab;
 
 use Board\PluginGitlab\Mcp\GitlabCommitsTool;
 use Board\PluginSdk\Contracts\Plugin;
+use Board\PluginSdk\Contracts\ProvidesAutomationActions;
 use Board\PluginSdk\Contracts\ProvidesListSource;
 use Board\PluginSdk\Contracts\ProvidesMcpTools;
 use Board\PluginSdk\Contracts\ProvidesOAuth;
 use Board\PluginSdk\Contracts\ProvidesSettings;
 use Board\PluginSdk\PluginListItem;
+use Board\PluginSdk\PluginToast;
 use Board\PluginSdk\Support\PluginSettings;
 use Board\PluginSdk\Support\SafeUrl;
 use Illuminate\Support\Collection;
@@ -22,7 +24,7 @@ use Illuminate\Support\Str;
  * Works against gitlab.com by default, or a self-hosted instance via the
  * `GITLAB_URL` environment variable (one instance per Board deployment).
  */
-class GitLabPlugin implements Plugin, ProvidesListSource, ProvidesMcpTools, ProvidesOAuth, ProvidesSettings
+class GitLabPlugin implements Plugin, ProvidesAutomationActions, ProvidesListSource, ProvidesMcpTools, ProvidesOAuth, ProvidesSettings
 {
     /**
      * The GitLab instance root, shared by the OAuth endpoints, the API client and
@@ -232,6 +234,63 @@ class GitLabPlugin implements Plugin, ProvidesListSource, ProvidesMcpTools, Prov
     /**
      * @param  array<string, mixed>  $config
      */
+    // --- ProvidesAutomationActions ---------------------------------------------
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function automationActions(): array
+    {
+        return [[
+            'key' => 'create_issue',
+            'label' => __('gitlab::messages.automation.create_issue'),
+            'configFields' => [
+                ['key' => 'project', 'label' => __('gitlab::messages.automation.project'), 'type' => 'text'],
+                ['key' => 'title', 'label' => __('gitlab::messages.automation.title'), 'type' => 'text'],
+                ['key' => 'body', 'label' => __('gitlab::messages.automation.body'), 'type' => 'text'],
+                ['key' => 'labels', 'label' => __('gitlab::messages.automation.labels'), 'type' => 'text'],
+            ],
+        ]];
+    }
+
+    public function runAutomationAction(array $config, string $key, array $card, array $actionConfig): ?PluginToast
+    {
+        if ($key !== 'create_issue') {
+            return null;
+        }
+
+        $project = trim((string) ($actionConfig['project'] ?? ''));
+
+        if ($project === '') {
+            throw new \RuntimeException('gitlab: project not configured (group/project or id).');
+        }
+
+        $replace = [
+            '{card}' => (string) ($card['title'] ?? ''),
+            '{board}' => (string) ($card['board'] ?? ''),
+            '{list}' => (string) ($card['list'] ?? ''),
+        ];
+
+        $title = trim(strtr((string) ($actionConfig['title'] ?? ''), $replace))
+            ?: ((string) ($card['title'] ?? '') ?: 'Board card');
+        $body = trim(strtr((string) ($actionConfig['body'] ?? ''), $replace));
+        $labels = array_values(array_filter(array_map(trim(...), explode(',', (string) ($actionConfig['labels'] ?? '')))));
+
+        $issue = $this->client($config)->createIssue($project, $title, $body, $labels);
+
+        $iid = (int) ($issue['iid'] ?? 0);
+        $url = (string) ($issue['web_url'] ?? '');
+
+        return new PluginToast(
+            message: __('gitlab::messages.automation.issue_created'),
+            description: $iid > 0 ? "{$project}#{$iid}" : $project,
+            duration: 8000,
+            actions: $url === '' ? [] : [
+                ['label' => __('gitlab::messages.automation.open_issue'), 'url' => $url],
+            ],
+        );
+    }
+
     private function client(array $config): GitLabClient
     {
         return new GitLabClient($config['token'] ?? null, self::baseUrl($config));

@@ -26,4 +26,13 @@ return [
         'allowed_hosts' => 'Hosts internos permitidos',
         'allowed_hosts_help' => 'Hosts en una red privada, separados por comas, que los tableros pueden usar (p. ej. un GitLab autoalojado). Los hosts públicos siempre se permiten; los internos deben listarse aquí.',
     ],
+    'automation' => [
+        'create_issue' => 'Crear una issue de GitLab',
+        'project' => 'Proyecto (grupo/proyecto o ID)',
+        'title' => 'Título ({card}, {board}, {list} se reemplazan — vacío = título de la tarjeta)',
+        'body' => 'Descripción (mismos marcadores, opcional)',
+        'labels' => 'Etiquetas (separadas por comas, opcional)',
+        'issue_created' => 'Incidencia de GitLab creada',
+        'open_issue' => 'Abrir la incidencia',
+    ],
 ];

@@ -26,4 +26,13 @@ return [
         'allowed_hosts' => 'Allowed internal hosts',
         'allowed_hosts_help' => 'Comma-separated hosts on a private network that boards may target (e.g. a self-hosted GitLab). Public hosts are always allowed; internal ones must be listed here.',
     ],
+    'automation' => [
+        'create_issue' => 'Create a GitLab issue',
+        'project' => 'Project (group/project or ID)',
+        'title' => 'Title ({card}, {board}, {list} are replaced — empty = card title)',
+        'body' => 'Description (same placeholders, optional)',
+        'labels' => 'Labels (comma-separated, optional)',
+        'issue_created' => 'GitLab issue created',
+        'open_issue' => 'Open the issue',
+    ],
 ];

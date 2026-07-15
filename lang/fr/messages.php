@@ -26,4 +26,13 @@ return [
         'allowed_hosts' => 'Hôtes internes autorisés',
         'allowed_hosts_help' => 'Hôtes sur réseau privé, séparés par des virgules, que les boards peuvent cibler (ex. un GitLab auto-hébergé). Les hôtes publics sont toujours autorisés ; les hôtes internes doivent être listés ici.',
     ],
+    'automation' => [
+        'create_issue' => 'Créer une issue GitLab',
+        'project' => 'Projet (groupe/projet ou ID)',
+        'title' => "Titre ({card}, {board}, {list} sont remplacés — vide = titre de la carte)",
+        'body' => 'Description (mêmes gabarits, optionnel)',
+        'labels' => 'Labels (séparés par des virgules, optionnel)',
+        'issue_created' => 'Issue GitLab créée',
+        'open_issue' => "Ouvrir l'issue",
+    ],
 ];
