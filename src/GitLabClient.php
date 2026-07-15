@@ -16,8 +16,13 @@ class GitLabClient
 {
     /**
      * @param  string  $baseUrl  the GitLab instance root, e.g. https://gitlab.com
+     * @param  array{host: string, ip: string, port: int}|null  $pin  vetted connection to pin the socket to (anti DNS-rebinding)
      */
-    public function __construct(private readonly ?string $token, private readonly string $baseUrl = 'https://gitlab.com') {}
+    public function __construct(
+        private readonly ?string $token,
+        private readonly string $baseUrl = 'https://gitlab.com',
+        private readonly ?array $pin = null,
+    ) {}
 
     private function request(): PendingRequest
     {
@@ -29,6 +34,14 @@ class GitLabClient
             ->withoutRedirecting()
             ->connectTimeout(3)
             ->timeout(8);
+
+        // Pin the connection to the exact IP that was vetted, so a DNS rebind
+        // between the check and the connect can't redirect us to an internal host.
+        if ($this->pin !== null) {
+            $request->withOptions([
+                'curl' => [CURLOPT_RESOLVE => ["{$this->pin['host']}:{$this->pin['port']}:{$this->pin['ip']}"]],
+            ]);
+        }
 
         return $this->token ? $request->withToken($this->token) : $request;
     }

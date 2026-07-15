@@ -293,7 +293,16 @@ class GitLabPlugin implements Plugin, ProvidesAutomationActions, ProvidesListSou
 
     private function client(array $config): GitLabClient
     {
-        return new GitLabClient($config['token'] ?? null, self::baseUrl($config));
+        $base = self::baseUrl($config);
+
+        // Pin the socket to the IP we vetted (allow-listed or public), defeating
+        // a DNS rebind between the base-URL check and the actual request. When
+        // the host can't be vetted (e.g. an admin's intentionally-internal
+        // default_instance_url), leave it unpinned — same behaviour as before.
+        $allowed = SafeUrl::parseHostList((string) PluginSettings::for(self::key())->get('allowed_hosts', ''));
+        $pin = SafeUrl::safeConnection($base, $allowed);
+
+        return new GitLabClient($config['token'] ?? null, $base, $pin);
     }
 
     /**
